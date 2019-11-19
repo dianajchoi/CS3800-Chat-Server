@@ -59,13 +59,13 @@ public class ChatClient {
 				@Override
 				public void run()
 				{
-					String message = "";
+					String message = stdin.nextLine();
 					while (!message.equals("."))
 					{
-						message = stdin.nextLine();
 						out.println(message);
+						message = stdin.nextLine();
 					}
-					return;
+					stdin.close();
 				}
 			});
 			
@@ -73,22 +73,21 @@ public class ChatClient {
 			{
 				@Override
 				public void run()
-				{
-					String message = "";
-					while (!message.endsWith(": ."))
+				{					
+					try
 					{
-						try
+						String message = in.readLine();
+						while (!message.endsWith(": ."))
 						{
-							message = in.readLine();
 							System.out.println(message);
+							message = in.readLine();
 						}
-						catch (IOException e)
-						{
-							System.out.println("Client-Read: I/O Exception: " + e.getMessage());
-							return;
-						}
+						connection.close();
 					}
-					return;
+					catch (IOException e)
+					{
+						System.out.println("Client-Read: I/O Exception: " + e.getMessage());
+					}
 				}
 			});
 			write.start();
