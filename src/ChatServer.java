@@ -1,5 +1,7 @@
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -103,18 +105,33 @@ public class ChatServer {
 		}
 	}
 	
-	private class UserThread extends Thread
+	public class UserThread extends Thread
 	{
 		private String username;
 		private Socket socket;
 		private ChatServer server;
 		private PrintWriter out;
 		private BufferedReader in;
+		private ChatWindow chatWindow;
 		
 		public UserThread(Socket connection, ChatServer chatServer)
 		{
 			this.socket = connection;
 			this.server = chatServer;
+			chatWindow = new ChatWindow();
+			chatWindow.getTextField().addActionListener(new ActionListener()
+			{
+				@Override
+				public void actionPerformed(ActionEvent a) {
+					String message = chatWindow.getTextField().getText();
+					server.writeMessage(username + ": " + message);
+					chatWindow.getTextField().setText("");
+					if (message.equals("."))
+					{
+						removeMe();
+					}
+				}
+			});
 		}
 		
 		public void run()
@@ -126,14 +143,13 @@ public class ChatServer {
 				registerNewUser();
 				server.writeMessage(username + " has joined the chatroom!", this);
 				
-				String message = "";
-				while (!message.equals("."))
+				String message = readMessage();
+				while (!message.equals(".")) //null-pointer here
 				{
-					message = in.readLine();
 					server.writeMessage(username + ": " + message);
+					message = readMessage();
 				}
-				server.removeUser(username, this);
-				server.writeMessage(username + " has left the chatroom", this);
+				removeMe();
 			}
 			catch (IOException e)
 			{
@@ -153,11 +169,30 @@ public class ChatServer {
 			}
 			server.addUsername(username);
 			out.println("Welcome " + username);
+			chatWindow.printMessageToScreen("Welcome " + username);
+		}
+		
+		public void removeMe()
+		{
+			server.removeUser(username, this);
+			server.writeMessage(username + " has left the chatroom", this);
+			chatWindow.exit();
 		}
 		
 		public void writeMessage(String message)
 		{
 			out.println(message);
+			chatWindow.printMessageToScreen(message);
+		}
+		
+		public String readMessage() throws IOException
+		{
+			String message = chatWindow.getTextField().getText();
+			if (message.equals(""))
+			{
+				message = in.readLine();
+			}
+			return message;
 		}
 	}
 }
