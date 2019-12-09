@@ -18,15 +18,13 @@ public class ChatWindow {
 	private JFrame window;
 	private JTextField typeYourMessageHere;
 	private JTextArea seeAllMessagesHere;
-	private boolean onUsernameSelection;
 	
 	public ChatWindow()
 	{
 		window = new JFrame("USS Smirnubs Chatter");
 		window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		initializeMessageArea();
-		window.setVisible(true);
-		onUsernameSelection = true;
+		window.setVisible(false);
 	}
 	
 	public void initializeMessageArea()
@@ -48,6 +46,21 @@ public class ChatWindow {
 	public void printMessageToScreen(String message)
 	{
 		seeAllMessagesHere.append(message + "\n");
+	}
+	
+	public void show()
+	{
+		window.setVisible(true);
+	}
+	
+	public String usernameSelection(boolean first)
+	{
+		String prompt = "Please enter a username:";
+		if (!first)
+		{
+			return JOptionPane.showInputDialog(window, "Invalid username.\n" + prompt, "Username Selection", JOptionPane.PLAIN_MESSAGE);
+		}
+		return JOptionPane.showInputDialog(window, prompt, "Username Selection", JOptionPane.PLAIN_MESSAGE);
 	}
 	
 	public void exit()

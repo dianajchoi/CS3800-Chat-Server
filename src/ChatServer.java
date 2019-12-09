@@ -1,14 +1,10 @@
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Scanner;
 import java.util.Set;
 /*
  * File: ChatServer.java
@@ -21,13 +17,13 @@ import java.util.Set;
  * Purpose: This class is a server that listens for
  *          connections from chat users. It keeps track
  *          of all the users currently connected using a
- *          concurrent HashMap.
+ *          Set of usernames and a Set of their output streams.
  */
 public class ChatServer {
 
 	private int portNumber;
 	private Set<String> usernames = new HashSet<>();
-	private Set<UserThread> clients = new HashSet<>();
+	private Set<PrintWriter> clientOutputs = new HashSet<>();
 	
 	public ChatServer(int port)
 	{
@@ -36,10 +32,7 @@ public class ChatServer {
 	
 	public static void main(String[] args) throws IOException
 	{
-		//Scanner stdin = new Scanner(System.in);
-		//System.out.println("Server: Enter port number: ");
-		int port = 5000; //stdin.nextInt();
-		//stdin.close();
+		int port = 5000;
 		ChatServer chatServer = new ChatServer(port);
 		chatServer.beginLoop();
 	}
@@ -55,8 +48,7 @@ public class ChatServer {
 				Socket connection = server.accept();
 				System.out.println("Server: Accepted new connection");
 				
-				UserThread newClient = new UserThread(connection, this);
-				clients.add(newClient);
+				UserThread newClient = new UserThread(connection);
 				newClient.start();
 			}
 		}
@@ -69,69 +61,22 @@ public class ChatServer {
 	
 	public void writeMessage(String message)
 	{
-		for (UserThread client : clients)
+		for (PrintWriter out : clientOutputs)
 		{
-			client.writeMessage(message);
+			out.println("OUTSIDEMESSAGE " + message);
 		}
 	}
 	
-	public void writeMessage(String message, UserThread notMe)
-	{
-		for (UserThread client : clients)
-		{
-			if (client != notMe)
-			{
-				client.writeMessage(message);
-			}
-		}
-	}
-	
-	public void addUsername(String newUsername)
-	{
-		usernames.add(newUsername);
-	}
-	
-	public Set<String> getUsernames()
-	{
-		return usernames;
-	}
-	
-	public void removeUser(String username, UserThread client)
-	{
-		if (usernames.remove(username))
-		{
-			clients.remove(client);
-			System.out.println("Server: " + username + " has left the chatroom.");
-		}
-	}
-	
-	public class UserThread extends Thread
+	private class UserThread extends Thread
 	{
 		private String username;
 		private Socket socket;
-		private ChatServer server;
-		private PrintWriter out;
 		private BufferedReader in;
-		private ChatWindow chatWindow;
+		private PrintWriter out;
 		
-		public UserThread(Socket connection, ChatServer chatServer)
+		public UserThread(Socket connection)
 		{
 			this.socket = connection;
-			this.server = chatServer;
-			chatWindow = new ChatWindow();
-			chatWindow.getTextField().addActionListener(new ActionListener()
-			{
-				@Override
-				public void actionPerformed(ActionEvent a) {
-					String message = chatWindow.getTextField().getText();
-					server.writeMessage(username + ": " + message);
-					chatWindow.getTextField().setText("");
-					if (message.equals("."))
-					{
-						removeMe();
-					}
-				}
-			});
 		}
 		
 		public void run()
@@ -141,13 +86,14 @@ public class ChatServer {
 				in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 				out = new PrintWriter(socket.getOutputStream(), true);
 				registerNewUser();
-				server.writeMessage(username + " has joined the chatroom!", this);
+				writeMessage(username + " has joined the chatroom!");
+				clientOutputs.add(out);
 				
-				String message = readMessage();
-				while (!message.equals(".")) //null-pointer here
+				String message = in.readLine();
+				while (!message.equals("."))
 				{
-					server.writeMessage(username + ": " + message);
-					message = readMessage();
+					writeMessage(username + ": " + message);
+					message = in.readLine();
 				}
 				removeMe();
 			}
@@ -159,40 +105,28 @@ public class ChatServer {
 		
 		public void registerNewUser() throws IOException
 		{
-			out.println("What is your name?");
+			out.println("ASKFORNAME0");
 			username = in.readLine();
-			while (username == null || server.getUsernames().contains(username))
+			while (username != null && usernames.contains(username))
 			{
-				out.println("Invalid username or username already in use. Try another.");
-				out.println("What is your name?");
+				out.println("ASKFORNAME1");
 				username = in.readLine();
 			}
-			server.addUsername(username);
-			out.println("Welcome " + username);
-			chatWindow.printMessageToScreen("Welcome " + username);
+			usernames.add(username);
+			out.println("WELCOMEMESSAGE " + username);
 		}
 		
 		public void removeMe()
 		{
-			server.removeUser(username, this);
-			server.writeMessage(username + " has left the chatroom", this);
-			chatWindow.exit();
-		}
-		
-		public void writeMessage(String message)
-		{
-			out.println(message);
-			chatWindow.printMessageToScreen(message);
-		}
-		
-		public String readMessage() throws IOException
-		{
-			String message = chatWindow.getTextField().getText();
-			if (message.equals(""))
+			out.println("LOGOUT");
+			usernames.remove(username);
+			clientOutputs.remove(out);
+			writeMessage(username + " has left the chatroom");
+			try
 			{
-				message = in.readLine();
+				socket.close();
 			}
-			return message;
+			catch (IOException e) {}
 		}
 	}
 }

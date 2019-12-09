@@ -2,11 +2,11 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.io.PrintWriter;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.BufferedReader;
-import java.io.Console;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Scanner;
 /*
  * File: ChatClient.java
  * Author: Diana Choi, Sara Joshi
@@ -25,21 +25,28 @@ public class ChatClient {
 	private String username;
 	private BufferedReader in;
 	private PrintWriter out;
+	private ChatWindow window;
 	
 	public ChatClient(InetAddress hostname, int port)
 	{
 		host = hostname;
 		portNumber = port;
+		window = new ChatWindow();
+		window.getTextField().addActionListener(new ActionListener()
+		{
+			@Override
+			public void actionPerformed(ActionEvent a) {
+				String message = window.getTextField().getText();
+				writeMessage(message);
+				window.getTextField().setText("");
+			}
+		});
 	}
 	
 	public static void main(String[] args) throws UnknownHostException
 	{
-		//Scanner stdin = new Scanner(System.in);
-		//System.out.println("Client: Enter host address: ");
-		InetAddress hostname = InetAddress.getLocalHost(); //stdin.nextLine();
-		//System.out.println("Client: Enter port number: ");
-		int port = 5000; //stdin.nextInt();
-		//stdin.close();
+		InetAddress hostname = InetAddress.getLocalHost();
+		int port = 5000;
 		ChatClient chatClient = new ChatClient(hostname, port);
 		chatClient.beginLoop();
 	}
@@ -50,48 +57,36 @@ public class ChatClient {
 		{
 			Socket connection = new Socket(host, portNumber);
 			System.out.println("Client: Connected to server");
-			Scanner stdin = new Scanner(System.in);
 			in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 			out = new PrintWriter(connection.getOutputStream(), true);
 			
-			Thread write = new Thread(new Runnable()
+			String message = in.readLine();
+			while (!message.equals("LOGOUT"))
 			{
-				@Override
-				public void run()
+				if (message.startsWith("ASKFORNAME"))
 				{
-					String message = stdin.nextLine();
-					while (!message.equals("."))
-					{
-						out.println(message);
-						message = stdin.nextLine();
-					}
-					stdin.close();
+					boolean first = (message.charAt(10) == '0');
+					String name = window.usernameSelection(first);
+					out.println(name);
 				}
-			});
-			
-			Thread read = new Thread(new Runnable()
-			{
-				@Override
-				public void run()
-				{					
-					try
-					{
-						String message = in.readLine();
-						while (!message.endsWith(": ."))
-						{
-							System.out.println(message);
-							message = in.readLine();
-						}
-						connection.close();
-					}
-					catch (IOException e)
-					{
-						System.out.println("Client-Read: I/O Exception: " + e.getMessage());
-					}
+				else if (message.startsWith("WELCOMEMESSAGE"))
+				{
+					username = message.substring(15);
+					window.show();
+					window.printMessageToScreen("Welcome " + username);
 				}
-			});
-			write.start();
-			read.start();
+				else if (message.startsWith("OUTSIDEMESSAGE"))
+				{
+					displayMessage(message.substring(15));
+				}
+				else
+				{
+					writeMessage(message);
+				}
+				message = in.readLine();
+			}
+			connection.close();
+			window.exit();
 		}
 		catch (UnknownHostException e)
 		{
@@ -103,14 +98,14 @@ public class ChatClient {
 		}
 	}
 	
-	public void setUsername(String name)
+	public void displayMessage(String message)
 	{
-		username = name;
+		System.out.println(message);
+		window.printMessageToScreen(message);
 	}
 	
-	
-	public String getUsername()
+	public void writeMessage(String message)
 	{
-		return username;
+		out.println(message);
 	}
 }
